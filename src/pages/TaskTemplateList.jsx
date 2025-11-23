@@ -127,7 +127,7 @@ const TaskTemplateList = () => {
     const newTask = {
       title: taskTitle,
       category: categoryKey,
-      datetime: new Date().toISOString(),
+      datetime: new Date().toLocaleString(),
       firebaseUID: user.uid,
     };
 

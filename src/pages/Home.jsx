@@ -105,17 +105,22 @@ const Home = () => {
     const task = {
       title: newTask.title.trim(),
       category: currentCategory,
-      datetime: newTask.datetime || defaultDateTime,
+      datetime: normalizeDateTime(newTask.datetime || defaultDateTime),
       completed: false,
       email: currentUser.email,
     };
 
     try {
-      const res = await API.post("/tasks", task);
+      const res = await API.post("/tasks", {
+        ...task,
+        datetime: normalizeDateTime(task.datetime),
+      });
+
       setTasks((prev) => [
         { ...res.data, originalIndex: prev.length },
         ...prev,
       ]);
+
       setShowModal(false);
       setNewTask({ title: "", datetime: "" });
     } catch (err) {

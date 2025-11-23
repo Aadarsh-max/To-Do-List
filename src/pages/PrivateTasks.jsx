@@ -76,28 +76,29 @@ const PrivateTasks = () => {
     }
   };
 
-  const addTask = async () => {
-    if (!title.trim()) return alert("Task title required!");
+ const addTask = async () => {
+  if (!title.trim()) return alert("Task title required!");
 
-    const normalizedDT = normalizeDateTime(dateTime);
-    if (!normalizedDT) return alert("Invalid date & time format");
+  const normalizedDT = normalizeDateTime(dateTime);
+  if (!normalizedDT) return alert("Invalid date & time format");
 
-    try {
-      const res = await API.post("/private-tasks", {
-        title,
-        description,
-        dateTime: normalizedDT,
-        firebaseUID,
-      });
+  try {
+    const res = await API.post("/private-tasks", {
+      title,
+      description,
+      dateTime: normalizedDT,
+      firebaseUID,
+    });
 
-      setTasks([res.data, ...tasks]);
-      setTitle("");
-      setDescription("");
-      setDateTime("");
-    } catch {
-      alert("Error adding task");
-    }
-  };
+    setTasks((prev) => [res.data, ...prev]);
+    setTitle("");
+    setDescription("");
+    setDateTime("");
+  } catch {
+    alert("Error adding task");
+  }
+};
+
 
   const deleteTask = async (id) => {
     try {
@@ -265,7 +266,7 @@ const PrivateTasks = () => {
                   </label>
                   <input
                     type="datetime-local"
-                    value={dateTime}
+                    value={normalizeDateTime(dateTime)}
                     onChange={(e) =>
                       setDateTime(normalizeDateTime(e.target.value))
                     }

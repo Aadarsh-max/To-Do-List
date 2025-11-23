@@ -6,7 +6,7 @@ import API from "../services/api";
 import TaskCard from "../components/TaskCard";
 import TaskTemplateCard from "../components/TaskTemplateCard";
 import { FaPlus } from "react-icons/fa";
-import { combineDateAndTime } from "../utils/timeUtil.js";
+import { normalizeDateTime } from "../utils/dateTimeUtil.js"; // <-- FIX ADDED
 
 const CalendarPage = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -20,7 +20,7 @@ const CalendarPage = () => {
     repeat: "none",
   });
   const [loading, setLoading] = useState(true);
-  const [addingTask, setAddingTask] = useState(false); // <-- loading buffer while adding
+  const [addingTask, setAddingTask] = useState(false);
   const [user, setUser] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -34,8 +34,10 @@ const CalendarPage = () => {
   ];
 
   const getLocalDateString = (date) => {
-    const tzOffset = date.getTimezoneOffset() * 60000;
-    return new Date(date - tzOffset).toISOString().slice(0, 10);
+    const y = date.getFullYear();
+    const m = (date.getMonth() + 1).toString().padStart(2, "0");
+    const d = date.getDate().toString().padStart(2, "0");
+    return `${y}-${m}-${d}`;
   };
 
   // Auth listener
@@ -55,24 +57,27 @@ const CalendarPage = () => {
     try {
       const res = await API.get(`/tasks?uid=${uid}`);
       setTasks(res.data);
-      setLoading(false);
     } catch (err) {
       console.error("Failed to fetch tasks:", err);
+    } finally {
       setLoading(false);
     }
   };
 
+  // Search listener
   useEffect(() => {
     const handleSearch = (e) => setSearchTerm(e.detail.toLowerCase());
     window.addEventListener("taskSearch", handleSearch);
     return () => window.removeEventListener("taskSearch", handleSearch);
   }, []);
 
+  // Filter tasks by selected date
   useEffect(() => {
-    const selectedDateString = getLocalDateString(selectedDate);
+    const selectedStr = getLocalDateString(selectedDate);
+
     let filtered = tasks.filter((t) => {
       if (!t.datetime) return false;
-      return t.datetime.split("T")[0] === selectedDateString;
+      return normalizeDateTime(t.datetime).split("T")[0] === selectedStr;
     });
 
     if (searchTerm.trim()) {
@@ -84,22 +89,22 @@ const CalendarPage = () => {
     setFilteredTasks(filtered);
   }, [selectedDate, tasks, searchTerm]);
 
-  // Add new task
+  // Add Task
   const handleAddTask = async (e) => {
     e.preventDefault();
     const currentUser = auth.currentUser;
     if (!currentUser) return alert("Please log in to add tasks");
     if (!newTask.title.trim()) return;
 
-    setAddingTask(true); // start loading
+    setAddingTask(true);
 
-    const timeString = newTask.datetime.split("T")[1] || "12:00";
-    const datetime = combineDateAndTime(selectedDate, timeString);
+    const date = getLocalDateString(selectedDate);
+    const time = newTask.datetime.split("T")[1] || "12:00";
+    const dateTimeLocal = `${date}T${time}`;
 
-    const task = {
+    const taskBase = {
       title: newTask.title.trim(),
       category: newTask.category,
-      datetime,
       completed: false,
       firebaseUID: currentUser.uid,
       repeat: newTask.repeat,
@@ -108,11 +113,12 @@ const CalendarPage = () => {
     try {
       const repeatCount = Number(newTask.repeat) || 0;
       for (let i = 0; i <= repeatCount; i++) {
-        const repeatedDate = new Date(datetime);
-        repeatedDate.setDate(repeatedDate.getDate() + i);
+        const d = new Date(dateTimeLocal);
+        d.setDate(d.getDate() + i);
+
         await API.post("/tasks", {
-          ...task,
-          datetime: repeatedDate.toISOString(),
+          ...taskBase,
+          datetime: normalizeDateTime(d), // <-- FIX: NO UTC SHIFT
         });
       }
 
@@ -127,7 +133,7 @@ const CalendarPage = () => {
     } catch (err) {
       console.error("Failed to add task:", err);
     } finally {
-      setAddingTask(false); // stop loading
+      setAddingTask(false);
     }
   };
 
@@ -135,7 +141,7 @@ const CalendarPage = () => {
     if (view !== "month") return null;
     const dateStr = getLocalDateString(date);
     const hasTask = tasks.some(
-      (t) => t.datetime && t.datetime.split("T")[0] === dateStr
+      (t) => normalizeDateTime(t.datetime).split("T")[0] === dateStr
     );
     return hasTask ? (
       <div className="flex justify-center mt-1">
@@ -178,7 +184,7 @@ const CalendarPage = () => {
           </span>
         </h2>
 
-        {/* Tasks */}
+        {/* Task List */}
         {filteredTasks.length > 0 ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredTasks.map((task) => (
@@ -223,7 +229,6 @@ const CalendarPage = () => {
                 required
               />
 
-              {/* Time Picker + Confirm Button UI */}
               <label className="font-semibold text-sm mb-1 block">
                 Select Time
               </label>
@@ -269,7 +274,6 @@ const CalendarPage = () => {
                 <option value="7">Repeat 7 Days</option>
               </select>
 
-              {/* Buttons */}
               <div className="flex gap-2">
                 <button
                   type="button"
