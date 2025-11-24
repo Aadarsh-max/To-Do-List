@@ -6,7 +6,6 @@ import API from "../services/api";
 import TaskCard from "../components/TaskCard";
 import TaskTemplateCard from "../components/TaskTemplateCard";
 import { FaPlus } from "react-icons/fa";
-import { normalizeDateTime } from "../utils/dateTimeUtil.js"; // <-- FIX ADDED
 
 const CalendarPage = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -77,7 +76,7 @@ const CalendarPage = () => {
 
     let filtered = tasks.filter((t) => {
       if (!t.datetime) return false;
-      return normalizeDateTime(t.datetime).split("T")[0] === selectedStr;
+      return t.datetime.split("T")[0] === selectedStr; // ⭐ No timezone conversion
     });
 
     if (searchTerm.trim()) {
@@ -100,7 +99,7 @@ const CalendarPage = () => {
 
     const date = getLocalDateString(selectedDate);
     const time = newTask.datetime.split("T")[1] || "12:00";
-    const dateTimeLocal = `${date}T${time}`;
+    const dateTimeLocal = `${date}T${time}`; // ⭐ Keep exact local time string
 
     const taskBase = {
       title: newTask.title.trim(),
@@ -116,9 +115,11 @@ const CalendarPage = () => {
         const d = new Date(dateTimeLocal);
         d.setDate(d.getDate() + i);
 
+        const localStr = `${getLocalDateString(d)}T${time}`; // ⭐ No timezone shift
+
         await API.post("/tasks", {
           ...taskBase,
-          datetime: normalizeDateTime(d), // <-- FIX: NO UTC SHIFT
+          datetime: localStr,
         });
       }
 
@@ -140,9 +141,7 @@ const CalendarPage = () => {
   const tileContent = ({ date, view }) => {
     if (view !== "month") return null;
     const dateStr = getLocalDateString(date);
-    const hasTask = tasks.some(
-      (t) => normalizeDateTime(t.datetime).split("T")[0] === dateStr
-    );
+    const hasTask = tasks.some((t) => t.datetime.split("T")[0] === dateStr);
     return hasTask ? (
       <div className="flex justify-center mt-1">
         <span className="w-2 h-2 rounded-full bg-blue-500"></span>
